@@ -1,57 +1,55 @@
-import {
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CustomerDto } from './dto/customer.dto';
 import { Customer } from './entities/customer.entity';
 
 @Injectable()
 export class CustomerService {
-  private customers: Customer[] = [
-    {
-      id: 1,
-      name: 'Matheus',
-    },
-  ];
+  constructor(
+    @InjectRepository(Customer)
+    private readonly _customerRepository: Repository<Customer>,
+  ) {}
 
   findAll() {
-    return this.customers;
+    return this._customerRepository.find();
   }
 
-  findOne(id: number) {
-    const customer = this.customers.find((c) => c.id == id);
+  async findOne(id: number) {
+    const customer = await this._customerRepository.findOne(id);
 
     if (!customer) {
-      throw new HttpException(
-        `Customer ID ${id} not found`,
-        HttpStatus.NOT_FOUND,
-      );
+      throw new NotFoundException(`Customer ID ${id} not found`);
     }
 
     return customer;
   }
 
   create(customerDto: CustomerDto) {
-    const customer: Customer = {
-      id: 1,
-      name: customerDto.name,
-    };
-
-    this.customers.push(customer);
-    return customerDto;
+    const customer = this._customerRepository.create(customerDto);
+    return this._customerRepository.save(customer);
   }
 
-  update(id: number, customerDto: Customer) {
-    const index = this.customers.findIndex((c) => c.id === id);
-    this.customers[index] = customerDto;
-  }
+  async update(id: number, customerDto: CustomerDto) {
+    const customer = await this._customerRepository.preload({
+      id,
+      ...customerDto,
+    });
 
-  remove(id: number) {
-    const index = this.customers.findIndex((c) => c.id === id);
-    if (index >= 0) {
-      this.customers.splice(index, 1);
+    if (!customer) {
+      throw new NotFoundException(`Customer ID ${id} not found`);
     }
+
+    return this._customerRepository.save(customer);
+  }
+
+  async remove(id: number) {
+    const customer = await this._customerRepository.findOne(id);
+
+    if (!customer) {
+      throw new NotFoundException(`Customer ID ${id} not found`);
+    }
+
+    return this._customerRepository.remove(customer);
   }
 }
